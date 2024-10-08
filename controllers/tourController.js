@@ -72,7 +72,7 @@ exports.createTour = async (req, res) => {
   } catch (err) {
     res.status(400).json({
       status: 'failed',
-      message: 'Invalid Data Sent'
+      message: err.message || 'An error occurred'
     });
   }
 };
@@ -98,7 +98,7 @@ exports.updateTour = async (req, res) => {
   } catch (err) {
     res.status(500).json({
       status: 'faailed',
-      message: err.message
+      message: err.message || 'An error occurred'
     });
   }
 };
@@ -146,6 +146,103 @@ exports.deleteTour = async (req, res) => {
     });
   }
 };
+
+exports.getTourStats=async (req,res)=>{
+  try{
+    const stats=await Tour.aggregate([
+      {
+        $match:{ratingAverage :{$gte:4.5}}
+      },
+      {
+        $group:{
+          // _id:'$difficulty',
+          _id:{$toUpper : '$difficulty'},
+          numTours:{$sum:1},
+          numRatings:{$sum : '$ratingQuantity'},
+          avgRating:{$avg : '$ratingAverage'},
+          avgPrice:{$avg : '$price'},
+          minPrice:{$min : '$price'},
+          maxPrice:{$max : '$price'}
+        }
+      },
+      {
+        $sort:{avgPrice:1}
+      },
+      // {
+      //   $match: {_id: {$ne:'EASY'}}    //easy wala hat jayage jo not equal he easy wahi bas jayega aage match me 
+      // }
+    ])
+    res.status(200).json({
+      status: 'success',
+      data:{
+        stats
+      },
+    });
+  }
+  catch(err){
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error. Could not delete the tour.',
+      error: err.message
+    });
+  }
+}
+
+exports.getMonthlyPlan=async(req,res)=>{
+  try{
+    const year=req.params.year*1;
+    const plan = await Tour.aggregate([
+      {
+        $unwind:'$startDates'
+      },
+      {
+        $match: {
+          startDates: { $gte: new Date('2021-01-01'), $lte: new Date('2021-12-31') }
+        }
+      },
+      {
+        $group:{
+          _id:{$month:'$startDates'},
+          numToursStart:{$sum : 1},
+          tours: {$push : '$name'}
+        }
+      },
+      {
+        $addFields:{
+          month : '$_id'
+        }
+      },
+      {
+        $project:{
+          _id:0
+        }
+      },
+      {
+        $sort:{numToursStart:-1}
+      },
+      // {
+      //   $limit:6   //isse sirf 6 outputs dikhenge
+      // }
+    ])
+    res.status(200).json({
+      status: 'success',
+      length: plan.length,
+      data:{
+        plan
+      },
+    });
+  }
+  catch(err){
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error. Could not delete the tour.',
+      error: err.message
+    });
+  }
+}
+
+
+
 
 //*******************###********************** */
 // exports.checkBody = (req, res, next) => {
